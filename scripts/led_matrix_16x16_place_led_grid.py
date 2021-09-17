@@ -20,6 +20,7 @@ class LedMatrix16x16PlaceLedGrid(pcbnew.ActionPlugin):
         re_ref_led = re.compile('^D([0-9]+)')
         re_netname_cathode = re.compile('.*/LED_K([0-9]+)')
         re_netname_anode = re.compile('.*/LED_A([0-9]+)')
+        re_ref_pmosfet = re.compile('Q([0-9]+)')
 
         board = pcbnew.GetBoard()
         for fp in board.Footprints():
@@ -53,13 +54,10 @@ class LedMatrix16x16PlaceLedGrid(pcbnew.ActionPlugin):
             print(
                 f'{ref}: A{an_num} K{cath_num}')
 
-            led_pos = pcbnew.wxPointMM(led_pitch_mm * cath_num + offs_x_mm,
-                                       led_pitch_mm * an_num + offs_y_mm)
+            led_pos = pcbnew.wxPointMM(led_pitch_mm * (15-cath_num) + offs_x_mm,
+                                       led_pitch_mm * (15-an_num) + offs_y_mm)
             fp.SetPosition(led_pos)
             fp.SetOrientationDegrees(45.0)
-
-            nbr_an_pos = pcbnew.wxPointMM(led_pitch_mm * cath_num + offs_x_mm,
-                                          led_pitch_mm * (an_num+1) + offs_y_mm)
 
             via_an_pos = pcbnew.wxPoint(
                 an_pad.GetCenter().x + 1000000,
@@ -108,6 +106,33 @@ class LedMatrix16x16PlaceLedGrid(pcbnew.ActionPlugin):
                 trk.SetNet(cath_pad.GetNet())
                 trk.SetWidth(200000)
                 board.Add(trk)
+
+        for fp in board.Footprints():
+            ref = fp.GetReference()
+            re_match = re_ref_pmosfet.match(ref)
+            if re_match is None or fp.GetPadCount() != 3:
+                print( f'Skipping footprint {ref} because of name or pad count.')
+                continue
+
+            an_pad = None
+            an_num = None
+
+            print(f'Diode {ref} ...')
+            for pad in fp.Pads():
+                netname = pad.GetNetname()
+                if (match := re_netname_anode.match(netname)) is not None:
+                    an_num = int(match.group(1))
+                    an_pad = pad
+
+            if an_pad is None :
+                continue
+
+            led_pos = pcbnew.wxPointMM(led_pitch_mm * 17 + offs_x_mm,
+                                       led_pitch_mm * (15-an_num) + offs_y_mm)
+            fp.SetPosition(led_pos)
+            fp.SetOrientationDegrees(-90.0)
+   
+
 
 
 LedMatrix16x16PlaceLedGrid().register()
